@@ -1,9 +1,13 @@
+/* Grundvariablen */
 :root {
     --bg-color: #1a1a1a;
     --card-front: #ecf0f1;
     --card-back: #2980b9;
     --border: #34495e;
     --active-color: #f1c40f;
+    --success-color: #27ae60;
+    --danger-color: #c0392b;
+    --accent-color: #e67e22;
 }
 
 body {
@@ -15,27 +19,110 @@ body {
     padding: 20px;
 }
 
-#setup-area {
-    margin-bottom: 20px;
-    background: #2c3e50;
-    padding: 15px;
-    border-radius: 8px;
-    display: inline-block;
+h1 {
+    color: var(--active-color);
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
 }
 
+/* --- SETUP & LOGIN SCREENS --- */
+.setup-area {
+    background: #2c3e50;
+    padding: 25px;
+    border-radius: 12px;
+    display: inline-block;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    max-width: 90%;
+    margin: 20px auto;
+}
+
+.setup-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.setup-group {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+    min-width: 150px;
+}
+
+.setup-group label {
+    font-size: 12px;
+    margin-bottom: 6px;
+    color: #bdc3c7;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+input,
+select {
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #444;
+    background: #1a1a1a;
+    color: white;
+    font-size: 1rem;
+}
+
+button {
+    padding: 12px 25px;
+    background: var(--success-color);
+    border: none;
+    color: white;
+    font-weight: bold;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: transform 0.2s, background 0.2s;
+}
+
+button:hover {
+    transform: translateY(-2px);
+    background: #2ecc71;
+}
+
+/* --- LOBBY & LINK SHARING --- */
+.link-copy-box {
+    display: flex;
+    gap: 10px;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 10px;
+    border-radius: 8px;
+    margin: 15px 0;
+}
+
+.link-copy-box input {
+    flex-grow: 1;
+    font-size: 0.8rem;
+    color: #aaa;
+}
+
+#player-wait-status {
+    font-style: italic;
+    color: var(--active-color);
+    margin: 15px 0;
+}
+
+/* --- SPIELSTATUS & LAYOUT --- */
 #status {
     font-size: 1.3rem;
     color: var(--active-color);
-    margin: 15px 0;
-    min-height: 30px;
+    margin: 20px 0;
+    min-height: 35px;
+    font-weight: bold;
 }
 
-/* Decks */
 .deck-area {
     display: flex;
     justify-content: center;
-    gap: 25px;
+    gap: 30px;
     margin-bottom: 40px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 15px;
 }
 
 .hand-container {
@@ -48,53 +135,54 @@ body {
 #discard-btn {
     margin-top: 10px;
     width: 100%;
-    padding: 8px 0;
-    background: #e67e22;
-    border: none;
-    color: white;
-    border-radius: 4px;
-    cursor: pointer;
+    padding: 10px 0;
+    background: var(--accent-color);
+    font-size: 0.8rem;
 }
 
 #discard-btn:disabled {
     background: #444;
-    color: #777;
+    opacity: 0.3;
     cursor: not-allowed;
-    opacity: 0.5;
+    transform: none;
 }
 
-/* Spieler-Bereiche */
+/* --- SPIELER & KARTEN-GITTER --- */
 #players-container {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 20px;
+    gap: 30px;
 }
 
 .player-area {
     background: rgba(255, 255, 255, 0.05);
-    padding: 15px;
-    border-radius: 15px;
+    padding: 20px;
+    border-radius: 20px;
     border: 3px solid #444;
     width: 360px;
-    transition: all 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .player-area.active {
     border-color: var(--active-color);
-    background: rgba(241, 196, 15, 0.08);
-    transform: scale(1.02);
+    background: rgba(241, 196, 15, 0.1);
+    box-shadow: 0 0 20px rgba(241, 196, 15, 0.2);
 }
 
-/* Karten & Grid */
+.player-area.is-me {
+    background: rgba(255, 255, 255, 0.1);
+}
+
 .grid-container {
     display: grid;
     grid-template-columns: repeat(4, 75px);
     grid-template-rows: repeat(3, 105px);
-    gap: 10px;
+    gap: 12px;
     justify-content: center;
 }
 
+/* --- KARTEN-STYLING --- */
 .card {
     width: 75px;
     height: 105px;
@@ -104,18 +192,32 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 22px;
-    font-weight: bold;
+    font-size: 26px;
+    font-weight: 900;
     cursor: pointer;
     border: 2px solid var(--border);
     position: relative;
-    transition: transform 0.1s;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s, box-shadow 0.2s;
+    user-select: none;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.4);
 }
 
 .card.back {
     background-color: var(--card-back);
+    background-image: radial-gradient(circle, #3498db 20%, #2980b9 80%);
     color: transparent;
     border-color: white;
+}
+
+.card.empty {
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px dashed #444;
+    color: transparent;
 }
 
 .card.hidden {
@@ -125,59 +227,68 @@ body {
 .label {
     font-size: 9px;
     position: absolute;
-    top: 4px;
-    color: #888;
+    top: 6px;
+    color: rgba(0, 0, 0, 0.4);
     text-transform: uppercase;
+    font-weight: bold;
 }
 
-/* Werte-Farben */
+/* --- SKYJO FARB-LOGIK (Werte) --- */
 .val-neg {
-    color: #8e44ad;
+    background-color: #9b59b6 !important;
+    color: white !important;
 }
 
+/* Violett: -2, -1 */
 .val-zero {
-    color: #27ae60;
+    background-color: #2ecc71 !important;
+    color: white !important;
 }
 
+/* Grün: 0 */
 .val-low {
-    color: #2980b9;
+    background-color: #3498db !important;
+    color: white !important;
 }
 
+/* Blau: 1-4 */
 .val-high {
-    color: #c0392b;
+    background-color: #e74c3c !important;
+    color: white !important;
 }
 
+/* Rot: 5-12 */
+
+/* --- ENDSCREEN --- */
 #end-screen {
     display: none;
-    /* Standardmäßig versteckt */
     position: fixed;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     background: #2c3e50;
-    padding: 30px;
-    border: 5px solid var(--active-color);
-    border-radius: 20px;
+    padding: 40px;
+    border: 6px solid var(--active-color);
+    border-radius: 25px;
     z-index: 1000;
-    box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
-}
-
-#end-screen h2 {
-    color: var(--active-color);
-    margin-top: 0;
+    box-shadow: 0 0 100px rgba(0, 0, 0, 0.9);
+    min-width: 300px;
 }
 
 #leaderboard {
     list-style: none;
     padding: 0;
-    font-size: 1.2rem;
+    margin: 20px 0;
 }
 
 #leaderboard li {
-    margin: 10px 0;
-    padding: 10px;
+    margin: 12px 0;
+    padding: 15px;
     background: rgba(255, 255, 255, 0.1);
-    border-radius: 5px;
+    border-radius: 10px;
+    font-size: 1.2rem;
+    display: flex;
+    justify-content: space-between;
 }
 
 .overlay-bg {
@@ -187,35 +298,7 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(5px);
     z-index: 999;
-}
-
-.setup-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 15px;
-    justify-content: center;
-    margin-bottom: 10px;
-}
-
-.setup-group {
-    display: flex;
-    flex-direction: column;
-    text-align: left;
-}
-
-.setup-group label {
-    font-size: 12px;
-    margin-bottom: 4px;
-    color: #bdc3c7;
-}
-
-#setup-area input,
-#setup-area select {
-    padding: 8px;
-    border-radius: 4px;
-    border: 1px solid #444;
-    background: #1a1a1a;
-    color: white;
 }

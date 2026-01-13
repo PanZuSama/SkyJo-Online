@@ -7,9 +7,10 @@ import {
   set,
   onValue,
   update,
+  get,
 } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js';
 
-// Deine Konfiguration
+// Firebase Konfiguration
 const firebaseConfig = {
   apiKey: 'AIzaSyAvUfC6Dg1hv5fZSU7aupx7CG-JknFMe6w',
   authDomain: 'skyjo-dadf5.firebaseapp.com',
@@ -20,19 +21,19 @@ const firebaseConfig = {
   measurementId: 'G-C420GD4ZD1',
 };
 
-// Firebase Initialisierung
 const app = initializeApp (firebaseConfig);
 const db = getDatabase (app);
 
 // Globale Variablen
 let players = [];
 let currentPlayerIndex = 0;
-let myPlayerIndex = 0;
+let myPlayerIndex = -1;
 let discardPile = [];
 let drawPile = [];
 let handCard = null;
 let gameState = 'WAITING';
 let roomPath = '';
+let myName = '';
 
 const container = document.getElementById ('players-container');
 const statusText = document.getElementById ('status');
@@ -40,22 +41,70 @@ const discardElement = document.getElementById ('discard-pile');
 const handElement = document.getElementById ('current-hand');
 const discardBtn = document.getElementById ('discard-btn');
 
+// BEIM LADEN: Prüfen ob ein Raum-Link genutzt wurde
+window.onload = () => {
+  const urlParams = new URLSearchParams (window.location.search);
+  const roomFromUrl = urlParams.get ('room');
+  if (roomFromUrl) {
+    document.getElementById ('room-id').value = roomFromUrl;
+    document.getElementById ('create-room-area').style.display = 'none';
+    statusText.innerText = 'Raum aus Link erkannt. Gib deinen Namen ein!';
+  }
+};
+
 /**
- * Betritt einen Raum oder erstellt ein neues Spiel
+ * Phase 1: Namen bestätigen
  */
-window.joinGame = function () {
-  const room = document.getElementById ('room-id').value;
+window.showRoomSetup = function () {
+  myName = document.getElementById ('player-name-input').value.trim ();
+  if (!myName) return alert ('Bitte gib einen Namen ein!');
+
+  document.getElementById ('login-screen').style.display = 'none';
+  document.getElementById ('room-setup').style.display = 'block';
+  statusText.innerText = 'Wähle einen Raumnamen oder erstelle einen.';
+};
+
+/**
+ * Phase 2: Raum erstellen oder beitreten (Auto-Positionierung)
+ */
+window.createAndJoin = async function () {
+  const room = document.getElementById ('room-id').value.trim ();
   if (!room) return alert ('Bitte Raumnamen eingeben!');
 
   roomPath = 'rooms/' + room;
-  myPlayerIndex = parseInt (document.getElementById ('my-position').value);
+  const roomRef = ref (db, roomPath);
 
-  // UI freischalten
-  document.getElementById ('game-main').style.display = 'block';
+  // Prüfen ob Raum existiert
+  const snapshot = await get (roomRef);
 
-  // Echtzeit-Überwachung des Raums
-  onValue (ref (db, roomPath), snapshot => {
+  if (!snapshot.exists ()) {
+    // ICH BIN DER HOST (Position 0)
+    myPlayerIndex = 0;
+    await initGame (room);
+  } else {
+    // ICH BIN EIN GAST -> Nächsten freien Platz suchen
     const data = snapshot.val ();
+    players = data.players;
+
+    // Suche Platz, der noch "Spieler X" heißt (Platzhalter aus initGame)
+    myPlayerIndex = players.findIndex (p => p.name.startsWith ('Spieler '));
+
+    if (myPlayerIndex === -1) return alert ('Raum ist leider voll!');
+
+    players[myPlayerIndex].name = myName;
+    await update (roomRef, {players: players});
+  }
+
+  // Einladungs-Link anzeigen
+  const shareUrl =
+    window.location.origin + window.location.pathname + '?room=' + room;
+  document.getElementById ('share-link').value = shareUrl;
+  document.getElementById ('share-area').style.display = 'block';
+  document.getElementById ('create-room-area').style.display = 'none';
+
+  // Echtzeit-Überwachung starten
+  onValue (roomRef, snap => {
+    const data = snap.val ();
     if (data) {
       players = data.players;
       currentPlayerIndex = data.currentPlayerIndex;
@@ -63,21 +112,46 @@ window.joinGame = function () {
       drawPile = data.drawPile;
       handCard = data.handCard;
       gameState = data.gameState;
-      render ();
-      updateStatusLabel ();
-    } else {
-      // Raum existiert nicht -> Erstmaliges Setup durchführen
-      initGame ();
+
+      if (gameState === 'WAITING') {
+        updateLobbyUI ();
+      } else {
+        document.getElementById ('room-setup').style.display = 'none';
+        document.getElementById ('game-main').style.display = 'block';
+        render ();
+        updateStatusLabel ();
+      }
     }
   });
 };
 
+function updateLobbyUI () {
+  const joinedCount = players.filter (p => !p.name.startsWith ('Spieler '))
+    .length;
+  const waitMsg = document.getElementById ('player-wait-status');
+  const hostArea = document.getElementById ('host-action-area');
+
+  waitMsg.innerText = `Bereit: ${joinedCount} Spieler im Raum.`;
+
+  if (myPlayerIndex === 0) {
+    hostArea.innerHTML = joinedCount >= 2
+      ? `<button onclick="startGameNow()" style="background: #27ae60;">Spiel für alle starten!</button>`
+      : `<p>Warte auf mindestens einen weiteren Mitspieler...</p>`;
+  } else {
+    hostArea.innerHTML = `<p>Warte darauf, dass der Host das Spiel startet...</p>`;
+  }
+}
+
+window.startGameNow = function () {
+  update (ref (db, roomPath), {gameState: 'START'});
+};
+
 /**
- * Initialisiert die Daten lokal und sendet sie an Firebase
+ * Initialisiert das Deck und die Platzhalter-Spieler
  */
-function initGame () {
-  const numPlayers = parseInt (document.getElementById ('player-count').value);
-  let newDrawPile = [];
+async function initGame (roomName) {
+  const maxPlayers = parseInt (document.getElementById ('player-count').value);
+  let deck = [];
   const dist = [
     {v: -2, c: 5},
     {v: -1, c: 10},
@@ -97,33 +171,32 @@ function initGame () {
   ];
   dist.forEach (item => {
     for (let i = 0; i < item.c; i++)
-      newDrawPile.push (item.v);
+      deck.push (item.v);
   });
-  newDrawPile.sort (() => Math.random () - 0.5);
+  deck.sort (() => Math.random () - 0.5);
 
   let newPlayers = [];
-  for (let p = 0; p < numPlayers; p++) {
+  for (let p = 0; p < maxPlayers; p++) {
     let b = [];
     for (let i = 0; i < 12; i++)
-      b.push ({value: newDrawPile.pop (), open: false});
-    newPlayers.push ({name: 'Spieler ' + (p + 1), board: b});
+      b.push ({value: deck.pop (), open: false});
+    // Nur Host hat schon seinen echten Namen
+    let pName = p === 0 ? myName : `Spieler ${p + 1}`;
+    newPlayers.push ({name: pName, board: b});
   }
 
   const initialData = {
     players: newPlayers,
-    discardPile: [newDrawPile.pop ()],
-    drawPile: newDrawPile,
+    discardPile: [deck.pop ()],
+    drawPile: deck,
     currentPlayerIndex: 0,
     handCard: null,
-    gameState: 'START',
+    gameState: 'WAITING',
   };
 
-  set (ref (db, roomPath), initialData);
+  await set (ref (db, roomPath), initialData);
 }
 
-/**
- * Aktualisiert Firebase nach jeder Aktion
- */
 function sync () {
   if (!roomPath) return;
   update (ref (db, roomPath), {
@@ -143,13 +216,10 @@ function render () {
     const isMe = pIdx === myPlayerIndex;
     pDiv.className = `player-area ${pIdx === currentPlayerIndex ? 'active' : ''} ${isMe ? 'is-me' : ''}`;
 
-    const score = player.board.reduce ((s, c) => {
-      if (gameState === 'FINISHED' || (c.open && c.value !== null)) {
-        return s + (c.value || 0);
-      }
-      return s;
-    }, 0);
-
+    const score = player.board.reduce (
+      (s, c) => (c.open && c.value !== null ? s + c.value : s),
+      0
+    );
     pDiv.innerHTML = `<h3>${player.name} ${isMe ? '(Du)' : ''} (${score} Pkt)</h3>`;
 
     const grid = document.createElement ('div');
@@ -163,7 +233,6 @@ function render () {
         applyColor (cDiv, card.value);
       }
       cDiv.onclick = () => {
-        // Nur klicken wenn man selbst dran ist UND es das eigene Board ist
         if (pIdx === currentPlayerIndex && pIdx === myPlayerIndex)
           handleBoardClick (cIdx);
       };
@@ -181,7 +250,6 @@ function render () {
   handElement.className = `card ${handCard === null ? 'empty' : ''}`;
   if (handCard !== null) applyColor (handElement, handCard);
 
-  // Button nur aktiv wenn man selbst dran ist
   discardBtn.disabled = !(gameState === 'ACTION' &&
     handCard !== null &&
     currentPlayerIndex === myPlayerIndex);
@@ -237,10 +305,18 @@ function updateStatusLabel () {
     statusText.innerText = amIActive
       ? 'Du: Decke 2 Karten auf!'
       : `${players[currentPlayerIndex].name} deckt auf...`;
-  } else {
+  } else if (gameState === 'DRAW') {
     statusText.innerText = amIActive
-      ? 'Du bist dran!'
+      ? 'Zieh eine Karte!'
       : `Warte auf ${players[currentPlayerIndex].name}...`;
+  } else if (gameState === 'ACTION') {
+    statusText.innerText = amIActive
+      ? 'Karte tauschen oder abwerfen?'
+      : `${players[currentPlayerIndex].name} am Zug...`;
+  } else if (gameState === 'FORCE_REVEAL') {
+    statusText.innerText = amIActive
+      ? 'Decke eine Karte auf!'
+      : `${players[currentPlayerIndex].name} deckt auf...`;
   }
 }
 
@@ -256,17 +332,16 @@ function showFinalResults () {
   list.innerHTML = '';
   results.forEach ((res, index) => {
     const li = document.createElement ('li');
-    li.innerHTML = `<strong>#${index + 1} ${res.name}</strong>: ${res.score} Punkte`;
+    li.innerHTML = `<span>#${index + 1} ${res.name}</span> <span>${res.score} Pkt</span>`;
     list.appendChild (li);
   });
 
   document.getElementById ('overlay').style.display = 'block';
   document.getElementById ('end-screen').style.display = 'block';
-  statusText.innerText = 'RUNDE BEENDET!';
 }
 
 window.closeEndScreen = function () {
-  set (ref (db, roomPath), null); // Raum löschen für Neustart
+  set (ref (db, roomPath), null);
   location.reload ();
 };
 
@@ -321,5 +396,8 @@ discardBtn.onclick = () => {
   }
 };
 
-window.joinGame = joinGame;
+// Global zugänglich machen
+window.joinGame = createAndJoin;
+window.showRoomSetup = showRoomSetup;
+window.startGameNow = startGameNow;
 window.closeEndScreen = closeEndScreen;

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Skyjo Online Multiplayer</title>
+    <title>Skyjo Realtime Online</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
@@ -13,45 +13,50 @@
     <div class="game-header">
         <h1>Skyjo Realtime Online</h1>
 
-        <div id="setup-area">
-            <div class="setup-grid">
-                <div class="setup-group">
-                    <label for="room-id">Raum-Name:</label>
-                    <input type="text" id="room-id" placeholder="z.B. Spieleabend"
-                        title="Gib einen Namen für den Spielraum ein">
-                </div>
-
-                <div class="setup-group">
-                    <label for="player-name-input">Dein Name:</label>
-                    <input type="text" id="player-name-input" placeholder="Dein Name" title="Dein Anzeigename im Spiel">
-                </div>
-
-                <div class="setup-group">
-                    <label for="my-position">Deine Position:</label>
-                    <select id="my-position" title="Wähle deine Spieler-Nummer (Position)">
-                        <option value="0">Position 1</option>
-                        <option value="1">Position 2</option>
-                        <option value="2">Position 3</option>
-                        <option value="3">Position 4</option>
-                    </select>
-                </div>
-
-                <div class="setup-group">
-                    <label for="player-count">Spieleranzahl (nur Host):</label>
-                    <select id="player-count" title="Wie viele Spieler nehmen insgesamt teil?">
-                        <option value="2">2 Spieler</option>
-                        <option value="3">3 Spieler</option>
-                        <option value="4">4 Spieler</option>
-                    </select>
-                </div>
+        <div id="login-screen" class="setup-area">
+            <div class="setup-group">
+                <label for="player-name-input">Dein Name:</label>
+                <input type="text" id="player-name-input" placeholder="Wie heißt du?" title="Dein Anzeigename">
             </div>
-
             <div style="margin-top: 15px;">
-                <button onclick="joinGame()" id="start-btn">Raum beitreten / Erstellen</button>
+                <button onclick="showRoomSetup()" id="login-btn">Weiter</button>
             </div>
         </div>
 
-        <div id="status">Gib einen Raumnamen ein und tritt bei!</div>
+        <div id="room-setup" class="setup-area" style="display: none;">
+
+            <div id="create-room-area">
+                <div class="setup-group">
+                    <label for="room-id">Raum-Name:</label>
+                    <input type="text" id="room-id" placeholder="z.B. spieleabend">
+                </div>
+                <div class="setup-group">
+                    <label for="player-count">Maximale Spieler:</label>
+                    <select id="player-count">
+                        <option value="2">2 Spieler</option>
+                        <option value="3">3 Spieler</option>
+                        <option value="4" selected>4 Spieler</option>
+                    </select>
+                </div>
+                <button onclick="createAndJoin()">Raum erstellen & beitreten</button>
+            </div>
+
+            <div id="share-area" style="display: none;">
+                <h3>Einladung an Freunde</h3>
+                <p>Teile diesen Link, damit andere beitreten können:</p>
+                <div class="link-copy-box">
+                    <input type="text" id="share-link" readonly>
+                    <button onclick="copyLink()">Kopieren</button>
+                </div>
+
+                <div id="lobby-status" style="margin-top: 20px;">
+                    <p id="player-wait-status">Warte auf Mitspieler...</p>
+                    <div id="host-action-area"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="status">Bitte gib deinen Namen ein.</div>
     </div>
 
     <div id="game-main" style="display: none;">
@@ -77,6 +82,16 @@
     </div>
 
     <script type="module" src="script.js"></script>
+
+    <script>
+        function copyLink() {
+            const copyText = document.getElementById("share-link");
+            copyText.select();
+            copyText.setSelectionRange(0, 99999);
+            navigator.clipboard.writeText(copyText.value);
+            alert("Link kopiert: " + copyText.value);
+        }
+    </script>
 </body>
 
 </html>
