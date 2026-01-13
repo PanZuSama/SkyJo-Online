@@ -35,92 +35,96 @@ let gameState = 'WAITING';
 let roomPath = '';
 let myName = '';
 
+// DOM Elemente
 const container = document.getElementById ('players-container');
 const statusText = document.getElementById ('status');
 const discardElement = document.getElementById ('discard-pile');
 const handElement = document.getElementById ('current-hand');
 const discardBtn = document.getElementById ('discard-btn');
 
-// BEIM LADEN: Prüfen ob ein Raum-Link genutzt wurde
-function checkUrlParams () {
+/**
+ * Initialisierung beim Laden
+ */
+function init () {
   const urlParams = new URLSearchParams (window.location.search);
   const roomFromUrl = urlParams.get ('room');
   if (roomFromUrl) {
     document.getElementById ('room-id').value = roomFromUrl;
     document.getElementById ('create-room-area').style.display = 'none';
-    statusText.innerText = 'Raum aus Link erkannt. Gib deinen Namen ein!';
+    statusText.innerText = 'Einladung erhalten! Gib deinen Namen ein.';
   }
+
+  // Button-Events verknüpfen
+  document
+    .getElementById ('login-btn')
+    .addEventListener ('click', showRoomSetup);
+  document
+    .getElementById ('create-room-btn')
+    .addEventListener ('click', createAndJoin);
+  document
+    .getElementById ('copy-link-btn')
+    .addEventListener ('click', copyLink);
+  document
+    .getElementById ('new-game-btn')
+    .addEventListener ('click', closeEndScreen);
 }
 
-/**
- * Phase 1: Namen bestätigen
- */
 function showRoomSetup () {
   myName = document.getElementById ('player-name-input').value.trim ();
-  if (!myName) return alert ('Bitte gib einen Namen ein!');
-
+  if (!myName) return alert ('Bitte gib deinen Namen ein!');
   document.getElementById ('login-screen').style.display = 'none';
   document.getElementById ('room-setup').style.display = 'block';
-  statusText.innerText = 'Wähle einen Raumnamen oder erstelle einen.';
+  statusText.innerText = 'Tritt einem Raum bei...';
 }
 
-/**
- * Phase 2: Raum erstellen oder beitreten (Auto-Positionierung)
- */
 async function createAndJoin () {
   const room = document.getElementById ('room-id').value.trim ();
   if (!room) return alert ('Bitte Raumnamen eingeben!');
 
   roomPath = 'rooms/' + room;
   const roomRef = ref (db, roomPath);
-
-  // Prüfen ob Raum existiert
   const snapshot = await get (roomRef);
 
   if (!snapshot.exists ()) {
-    // ICH BIN DER HOST (Position 0)
+    // HOST erstellt Spiel
     myPlayerIndex = 0;
-    await initGame (room);
+    await initGameData ();
   } else {
-    // ICH BIN EIN GAST -> Nächsten freien Platz suchen
+    // GAST tritt bei
     const data = snapshot.val ();
     players = data.players;
-
-    // Suche Platz, der noch "Spieler X" heißt (Platzhalter aus initGame)
     myPlayerIndex = players.findIndex (p => p.name.startsWith ('Spieler '));
 
     if (myPlayerIndex === -1) return alert ('Raum ist leider voll!');
-
     players[myPlayerIndex].name = myName;
     await update (roomRef, {players: players});
   }
 
-  // Einladungs-Link anzeigen
-  const shareUrl =
-    window.location.origin + window.location.pathname + '?room=' + room;
+  // Link anzeigen
+  const shareUrl = `${window.location.origin}${window.location.pathname}?room=${room}`;
   document.getElementById ('share-link').value = shareUrl;
   document.getElementById ('share-area').style.display = 'block';
   document.getElementById ('create-room-area').style.display = 'none';
 
-  // Echtzeit-Überwachung starten
+  // Echtzeit-Update Loop
   onValue (roomRef, snap => {
     const data = snap.val ();
-    if (data) {
-      players = data.players;
-      currentPlayerIndex = data.currentPlayerIndex;
-      discardPile = data.discardPile;
-      drawPile = data.drawPile;
-      handCard = data.handCard;
-      gameState = data.gameState;
+    if (!data) return;
 
-      if (gameState === 'WAITING') {
-        updateLobbyUI ();
-      } else {
-        document.getElementById ('room-setup').style.display = 'none';
-        document.getElementById ('game-main').style.display = 'block';
-        render ();
-        updateStatusLabel ();
-      }
+    players = data.players;
+    currentPlayerIndex = data.currentPlayerIndex;
+    discardPile = data.discardPile;
+    drawPile = data.drawPile;
+    handCard = data.handCard;
+    gameState = data.gameState;
+
+    if (gameState === 'WAITING') {
+      updateLobbyUI ();
+    } else {
+      document.getElementById ('room-setup').style.display = 'none';
+      document.getElementById ('game-main').style.display = 'block';
+      render ();
+      updateStatusLabel ();
     }
   });
 }
@@ -132,31 +136,24 @@ function updateLobbyUI () {
   const hostArea = document.getElementById ('host-action-area');
 
   waitMsg.innerText = `Bereit: ${joinedCount} Spieler im Raum.`;
-
   hostArea.innerHTML = '';
+
   if (myPlayerIndex === 0) {
     if (joinedCount >= 2) {
       const btn = document.createElement ('button');
-      btn.textContent = 'Spiel für alle starten!';
-      btn.style.background = '#27ae60';
-      btn.addEventListener ('click', startGameNow);
+      btn.textContent = 'Spiel jetzt starten!';
+      btn.className = 'btn-start';
+      btn.onclick = () => update (ref (db, roomPath), {gameState: 'START'});
       hostArea.appendChild (btn);
     } else {
-      hostArea.innerHTML = `<p>Warte auf mindestens einen weiteren Mitspieler...</p>`;
+      hostArea.innerHTML = '<p>Warte auf Mitspieler...</p>';
     }
   } else {
-    hostArea.innerHTML = `<p>Warte darauf, dass der Host das Spiel startet...</p>`;
+    hostArea.innerHTML = '<p>Warte auf Start durch den Host...</p>';
   }
 }
 
-function startGameNow () {
-  update (ref (db, roomPath), {gameState: 'START'});
-}
-
-/**
- * Initialisiert das Deck und die Platzhalter-Spieler
- */
-async function initGame (roomName) {
+async function initGameData () {
   const maxPlayers = parseInt (document.getElementById ('player-count').value);
   let deck = [];
   const dist = [
@@ -187,32 +184,16 @@ async function initGame (roomName) {
     let b = [];
     for (let i = 0; i < 12; i++)
       b.push ({value: deck.pop (), open: false});
-    // Nur Host hat schon seinen echten Namen
-    let pName = p === 0 ? myName : `Spieler ${p + 1}`;
-    newPlayers.push ({name: pName, board: b});
+    newPlayers.push ({name: p === 0 ? myName : `Spieler ${p + 1}`, board: b});
   }
 
-  const initialData = {
+  await set (ref (db, roomPath), {
     players: newPlayers,
     discardPile: [deck.pop ()],
     drawPile: deck,
     currentPlayerIndex: 0,
     handCard: null,
     gameState: 'WAITING',
-  };
-
-  await set (ref (db, roomPath), initialData);
-}
-
-function sync () {
-  if (!roomPath) return;
-  update (ref (db, roomPath), {
-    players,
-    currentPlayerIndex,
-    discardPile,
-    drawPile,
-    handCard,
-    gameState,
   });
 }
 
@@ -239,10 +220,9 @@ function render () {
         cDiv.innerText = card.value;
         applyColor (cDiv, card.value);
       }
-      cDiv.addEventListener ('click', () => {
-        if (pIdx === currentPlayerIndex && pIdx === myPlayerIndex)
-          handleBoardClick (cIdx);
-      });
+      cDiv.onclick = () => {
+        if (pIdx === currentPlayerIndex && isMe) handleBoardClick (cIdx);
+      };
       grid.appendChild (cDiv);
     });
     pDiv.appendChild (grid);
@@ -256,17 +236,14 @@ function render () {
   handElement.innerText = handCard !== null ? handCard : '';
   handElement.className = `card ${handCard === null ? 'empty' : ''}`;
   if (handCard !== null) applyColor (handElement, handCard);
-
   discardBtn.disabled = !(gameState === 'ACTION' &&
     handCard !== null &&
     currentPlayerIndex === myPlayerIndex);
 }
 
 function handleBoardClick (idx) {
-  if (gameState === 'FINISHED') return;
   let p = players[currentPlayerIndex];
   let c = p.board[idx];
-
   if (gameState === 'START' && !c.open) {
     c.open = true;
     if (p.board.filter (k => k.open).length >= 2) {
@@ -295,54 +272,58 @@ function nextTurn () {
   if (isFinished) {
     gameState = 'FINISHED';
     players.forEach (p => p.board.forEach (card => (card.open = true)));
-    sync ();
-    return;
+  } else {
+    currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+    gameState = 'DRAW';
   }
-  currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
-  gameState = 'DRAW';
+}
+
+function sync () {
+  update (ref (db, roomPath), {
+    players,
+    currentPlayerIndex,
+    discardPile,
+    drawPile,
+    handCard,
+    gameState,
+  });
 }
 
 function updateStatusLabel () {
-  if (gameState === 'FINISHED') {
-    showFinalResults ();
-    return;
-  }
-  const amIActive = currentPlayerIndex === myPlayerIndex;
-  if (gameState === 'START') {
-    statusText.innerText = amIActive
-      ? 'Du: Decke 2 Karten auf!'
+  if (gameState === 'FINISHED') return showFinalResults ();
+  const active = currentPlayerIndex === myPlayerIndex;
+  if (gameState === 'START')
+    statusText.innerText = active
+      ? 'Decke 2 Karten auf!'
       : `${players[currentPlayerIndex].name} deckt auf...`;
-  } else if (gameState === 'DRAW') {
-    statusText.innerText = amIActive
+  else if (gameState === 'DRAW')
+    statusText.innerText = active
       ? 'Zieh eine Karte!'
-      : `Warte auf ${players[currentPlayerIndex].name}...`;
-  } else if (gameState === 'ACTION') {
-    statusText.innerText = amIActive
-      ? 'Karte tauschen oder abwerfen?'
-      : `${players[currentPlayerIndex].name} am Zug...`;
-  } else if (gameState === 'FORCE_REVEAL') {
-    statusText.innerText = amIActive
+      : `${players[currentPlayerIndex].name} zieht...`;
+  else if (gameState === 'ACTION')
+    statusText.innerText = active
+      ? 'Tauschen oder Abwerfen?'
+      : `${players[currentPlayerIndex].name} entscheidet...`;
+  else if (gameState === 'FORCE_REVEAL')
+    statusText.innerText = active
       ? 'Decke eine Karte auf!'
       : `${players[currentPlayerIndex].name} deckt auf...`;
-  }
 }
 
 function showFinalResults () {
   const results = players
-    .map (p => {
-      const finalScore = p.board.reduce ((s, c) => s + (c.value || 0), 0);
-      return {name: p.name, score: finalScore};
-    })
+    .map (p => ({
+      name: p.name,
+      score: p.board.reduce ((s, c) => s + (c.value || 0), 0),
+    }))
     .sort ((a, b) => a.score - b.score);
-
   const list = document.getElementById ('leaderboard');
-  list.innerHTML = '';
-  results.forEach ((res, index) => {
-    const li = document.createElement ('li');
-    li.innerHTML = `<span>#${index + 1} ${res.name}</span> <span>${res.score} Pkt</span>`;
-    list.appendChild (li);
-  });
-
+  list.innerHTML = results
+    .map (
+      (r, i) =>
+        `<li><span>#${i + 1} ${r.name}</span> <span>${r.score} Pkt</span></li>`
+    )
+    .join ('');
   document.getElementById ('overlay').style.display = 'block';
   document.getElementById ('end-screen').style.display = 'block';
 }
@@ -353,18 +334,10 @@ function closeEndScreen () {
 }
 
 function copyLink () {
-  const copyText = document.getElementById ('share-link');
-  copyText.select ();
-  copyText.setSelectionRange (0, 99999);
-
-  navigator.clipboard
-    .writeText (copyText.value)
-    .then (() => {
-      alert ('Link kopiert: ' + copyText.value);
-    })
-    .catch (err => {
-      console.error ('Fehler beim Kopieren:', err);
-    });
+  const link = document.getElementById ('share-link');
+  link.select ();
+  navigator.clipboard.writeText (link.value);
+  alert ('Link kopiert!');
 }
 
 function applyColor (el, v) {
@@ -378,10 +351,10 @@ function applyColor (el, v) {
 function checkCols (b) {
   for (let col = 0; col < 4; col++) {
     let i = [col, col + 4, col + 8];
-    let v = i.map (idx => b[idx]);
     if (
-      v.every (
-        card => card.open && card.value !== null && card.value === v[0].value
+      i.every (
+        idx =>
+          b[idx].open && b[idx].value !== null && b[idx].value === b[i[0]].value
       )
     ) {
       i.forEach (idx => (b[idx].value = null));
@@ -389,23 +362,21 @@ function checkCols (b) {
   }
 }
 
-document.getElementById ('draw-pile').addEventListener ('click', () => {
+document.getElementById ('draw-pile').onclick = () => {
   if (gameState === 'DRAW' && currentPlayerIndex === myPlayerIndex) {
     handCard = drawPile.pop ();
     gameState = 'ACTION';
     sync ();
   }
-});
-
-discardElement.addEventListener ('click', () => {
+};
+discardElement.onclick = () => {
   if (gameState === 'DRAW' && currentPlayerIndex === myPlayerIndex) {
     handCard = discardPile.pop ();
     gameState = 'ACTION';
     sync ();
   }
-});
-
-discardBtn.addEventListener ('click', () => {
+};
+discardBtn.onclick = () => {
   if (
     gameState === 'ACTION' &&
     handCard !== null &&
@@ -416,17 +387,7 @@ discardBtn.addEventListener ('click', () => {
     gameState = 'FORCE_REVEAL';
     sync ();
   }
-});
+};
 
-// Event Listeners
-document.getElementById ('login-btn').addEventListener ('click', showRoomSetup);
-document
-  .getElementById ('create-room-btn')
-  .addEventListener ('click', createAndJoin);
-document
-  .getElementById ('new-game-btn')
-  .addEventListener ('click', closeEndScreen);
-document.getElementById ('copy-link-btn').addEventListener ('click', copyLink);
-
-// Init
-checkUrlParams ();
+// Start
+init ();

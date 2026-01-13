@@ -24,7 +24,6 @@
         </div>
 
         <div id="room-setup" class="setup-area" style="display: none;">
-
             <div id="create-room-area">
                 <div class="setup-group">
                     <label for="room-id">Raum-Name:</label>
@@ -43,12 +42,11 @@
 
             <div id="share-area" style="display: none;">
                 <h3>Einladung an Freunde</h3>
-                <p>Teile diesen Link, damit andere beitreten können:</p>
+                <p>Teile diesen Link für den Beitritt:</p>
                 <div class="link-copy-box">
                     <input type="text" id="share-link" readonly>
                     <button id="copy-link-btn">Kopieren</button>
                 </div>
-
                 <div id="lobby-status" style="margin-top: 20px;">
                     <p id="player-wait-status">Warte auf Mitspieler...</p>
                     <div id="host-action-area"></div>
@@ -62,15 +60,12 @@
     <div id="game-main" style="display: none;">
         <div class="deck-area">
             <div id="draw-pile" class="card back"><span class="label">Stapel</span>?</div>
-
             <div class="hand-container">
                 <div id="current-hand" class="card empty"><span class="label">Hand</span></div>
                 <button id="discard-btn" disabled>Abwerfen</button>
             </div>
-
             <div id="discard-pile" class="card"><span class="label">Ablage</span></div>
         </div>
-
         <div id="players-container"></div>
     </div>
 
