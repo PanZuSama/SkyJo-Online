@@ -42,7 +42,7 @@ const handElement = document.getElementById ('current-hand');
 const discardBtn = document.getElementById ('discard-btn');
 
 // BEIM LADEN: Prüfen ob ein Raum-Link genutzt wurde
-window.onload = () => {
+function checkUrlParams () {
   const urlParams = new URLSearchParams (window.location.search);
   const roomFromUrl = urlParams.get ('room');
   if (roomFromUrl) {
@@ -50,24 +50,24 @@ window.onload = () => {
     document.getElementById ('create-room-area').style.display = 'none';
     statusText.innerText = 'Raum aus Link erkannt. Gib deinen Namen ein!';
   }
-};
+}
 
 /**
  * Phase 1: Namen bestätigen
  */
-window.showRoomSetup = function () {
+function showRoomSetup () {
   myName = document.getElementById ('player-name-input').value.trim ();
   if (!myName) return alert ('Bitte gib einen Namen ein!');
 
   document.getElementById ('login-screen').style.display = 'none';
   document.getElementById ('room-setup').style.display = 'block';
   statusText.innerText = 'Wähle einen Raumnamen oder erstelle einen.';
-};
+}
 
 /**
  * Phase 2: Raum erstellen oder beitreten (Auto-Positionierung)
  */
-window.createAndJoin = async function () {
+async function createAndJoin () {
   const room = document.getElementById ('room-id').value.trim ();
   if (!room) return alert ('Bitte Raumnamen eingeben!');
 
@@ -123,7 +123,7 @@ window.createAndJoin = async function () {
       }
     }
   });
-};
+}
 
 function updateLobbyUI () {
   const joinedCount = players.filter (p => !p.name.startsWith ('Spieler '))
@@ -133,18 +133,25 @@ function updateLobbyUI () {
 
   waitMsg.innerText = `Bereit: ${joinedCount} Spieler im Raum.`;
 
+  hostArea.innerHTML = '';
   if (myPlayerIndex === 0) {
-    hostArea.innerHTML = joinedCount >= 2
-      ? `<button onclick="startGameNow()" style="background: #27ae60;">Spiel für alle starten!</button>`
-      : `<p>Warte auf mindestens einen weiteren Mitspieler...</p>`;
+    if (joinedCount >= 2) {
+      const btn = document.createElement ('button');
+      btn.textContent = 'Spiel für alle starten!';
+      btn.style.background = '#27ae60';
+      btn.addEventListener ('click', startGameNow);
+      hostArea.appendChild (btn);
+    } else {
+      hostArea.innerHTML = `<p>Warte auf mindestens einen weiteren Mitspieler...</p>`;
+    }
   } else {
     hostArea.innerHTML = `<p>Warte darauf, dass der Host das Spiel startet...</p>`;
   }
 }
 
-window.startGameNow = function () {
+function startGameNow () {
   update (ref (db, roomPath), {gameState: 'START'});
-};
+}
 
 /**
  * Initialisiert das Deck und die Platzhalter-Spieler
@@ -232,10 +239,10 @@ function render () {
         cDiv.innerText = card.value;
         applyColor (cDiv, card.value);
       }
-      cDiv.onclick = () => {
+      cDiv.addEventListener ('click', () => {
         if (pIdx === currentPlayerIndex && pIdx === myPlayerIndex)
           handleBoardClick (cIdx);
-      };
+      });
       grid.appendChild (cDiv);
     });
     pDiv.appendChild (grid);
@@ -340,10 +347,25 @@ function showFinalResults () {
   document.getElementById ('end-screen').style.display = 'block';
 }
 
-window.closeEndScreen = function () {
+function closeEndScreen () {
   set (ref (db, roomPath), null);
   location.reload ();
-};
+}
+
+function copyLink () {
+  const copyText = document.getElementById ('share-link');
+  copyText.select ();
+  copyText.setSelectionRange (0, 99999);
+
+  navigator.clipboard
+    .writeText (copyText.value)
+    .then (() => {
+      alert ('Link kopiert: ' + copyText.value);
+    })
+    .catch (err => {
+      console.error ('Fehler beim Kopieren:', err);
+    });
+}
 
 function applyColor (el, v) {
   el.classList.remove ('val-neg', 'val-zero', 'val-high', 'val-low');
@@ -367,23 +389,23 @@ function checkCols (b) {
   }
 }
 
-document.getElementById ('draw-pile').onclick = () => {
+document.getElementById ('draw-pile').addEventListener ('click', () => {
   if (gameState === 'DRAW' && currentPlayerIndex === myPlayerIndex) {
     handCard = drawPile.pop ();
     gameState = 'ACTION';
     sync ();
   }
-};
+});
 
-discardElement.onclick = () => {
+discardElement.addEventListener ('click', () => {
   if (gameState === 'DRAW' && currentPlayerIndex === myPlayerIndex) {
     handCard = discardPile.pop ();
     gameState = 'ACTION';
     sync ();
   }
-};
+});
 
-discardBtn.onclick = () => {
+discardBtn.addEventListener ('click', () => {
   if (
     gameState === 'ACTION' &&
     handCard !== null &&
@@ -394,10 +416,17 @@ discardBtn.onclick = () => {
     gameState = 'FORCE_REVEAL';
     sync ();
   }
-};
+});
 
-// Global zugänglich machen
-window.joinGame = createAndJoin;
-window.showRoomSetup = showRoomSetup;
-window.startGameNow = startGameNow;
-window.closeEndScreen = closeEndScreen;
+// Event Listeners
+document.getElementById ('login-btn').addEventListener ('click', showRoomSetup);
+document
+  .getElementById ('create-room-btn')
+  .addEventListener ('click', createAndJoin);
+document
+  .getElementById ('new-game-btn')
+  .addEventListener ('click', closeEndScreen);
+document.getElementById ('copy-link-btn').addEventListener ('click', copyLink);
+
+// Init
+checkUrlParams ();

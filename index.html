@@ -19,7 +19,7 @@
                 <input type="text" id="player-name-input" placeholder="Wie heißt du?" title="Dein Anzeigename">
             </div>
             <div style="margin-top: 15px;">
-                <button onclick="showRoomSetup()" id="login-btn">Weiter</button>
+                <button id="login-btn">Weiter</button>
             </div>
         </div>
 
@@ -38,7 +38,7 @@
                         <option value="4" selected>4 Spieler</option>
                     </select>
                 </div>
-                <button onclick="createAndJoin()">Raum erstellen & beitreten</button>
+                <button id="create-room-btn">Raum erstellen & beitreten</button>
             </div>
 
             <div id="share-area" style="display: none;">
@@ -46,7 +46,7 @@
                 <p>Teile diesen Link, damit andere beitreten können:</p>
                 <div class="link-copy-box">
                     <input type="text" id="share-link" readonly>
-                    <button onclick="copyLink()">Kopieren</button>
+                    <button id="copy-link-btn">Kopieren</button>
                 </div>
 
                 <div id="lobby-status" style="margin-top: 20px;">
@@ -78,20 +78,10 @@
     <div id="end-screen">
         <h2>Runde Beendet!</h2>
         <ul id="leaderboard"></ul>
-        <button onclick="closeEndScreen()">Neues Spiel starten</button>
+        <button id="new-game-btn">Neues Spiel starten</button>
     </div>
 
     <script type="module" src="script.js"></script>
-
-    <script>
-        function copyLink() {
-            const copyText = document.getElementById("share-link");
-            copyText.select();
-            copyText.setSelectionRange(0, 99999);
-            navigator.clipboard.writeText(copyText.value);
-            alert("Link kopiert: " + copyText.value);
-        }
-    </script>
 </body>
 
 </html>
